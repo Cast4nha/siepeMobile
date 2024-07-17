@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="16dp"
+              tools:context=".MainActivity">
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Formulário"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_gravity="center_horizontal"
+            android:paddingBottom="16dp" />
+
+    <EditText
+            android:id="@+id/etName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Nome" />
+
+    <EditText
+            android:id="@+id/etEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Email"
+            android:inputType="textEmailAddress" />
+
+    <EditText
+            android:id="@+id/etPhone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Telefone"
+            android:inputType="phone" />
+
+    <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enviar" />
+
+</LinearLayout>
