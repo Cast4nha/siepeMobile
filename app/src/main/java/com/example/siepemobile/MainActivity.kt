@@ -35,13 +35,11 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterialApi::class)
 class MainActivity : ComponentActivity() {
-    private var isHeaderWritten = false
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                FormScreen()
+                telaFormulario()
             }
         }
 
@@ -57,22 +55,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun writeCSV(data: List<String>): File? {
-        val fileName = "pesca_data_${System.currentTimeMillis()}.csv"
-        val file = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
+    private fun escreverCSV(dados: List<String>): File? {
+        val nomeArquivo = "pesca_data_${System.currentTimeMillis()}.csv"
+        val arquivo = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), nomeArquivo)
 
         try {
-            FileWriter(file).use { writer ->
-                writer.append("Seção,Nome do Pescador,Comunidade,Dia do Início,Dia do Fim,Dias da Semana,Quantos dias pescou?,...")
-                writer.append("\n")
-                writer.append(data.joinToString(","))
-                writer.append("\n")
+            FileWriter(arquivo).use { escritor ->
+                escritor.append("Seção,Nome do Pescador,Comunidade,Dia do Início,Dia do Fim,Dias da Semana,Quantos dias pescou?,...")
+                escritor.append("\n")
+                escritor.append(dados.joinToString(","))
+                escritor.append("\n")
             }
-            println("Arquivo salvo com sucesso em: ${file.absolutePath}")
+            println("Arquivo salvo com sucesso em: ${arquivo.absolutePath}")
             runOnUiThread {
-                Toast.makeText(this, "Arquivo salvo em: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Arquivo salvo em: ${arquivo.absolutePath}", Toast.LENGTH_LONG).show()
             }
-            return file
+            return arquivo
         } catch (e: IOException) {
             e.printStackTrace()
             println("Erro ao salvar o arquivo: ${e.message}")
@@ -84,95 +82,94 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun FormScreen() {
-        var currentSection by remember { mutableStateOf(1) }
-        val data = remember { mutableStateListOf<String>() }
-        var showSuccessDialog by remember { mutableStateOf(false) }
-        var showSendDialog by remember { mutableStateOf(false) }
-        val context = LocalContext.current
+    private fun telaFormulario() {
+        var secaoAtual by remember { mutableStateOf(1) }
+        val dados = remember { mutableStateListOf<String>() }
+        var mostrarDialogoSucesso by remember { mutableStateOf(false) }
+        var mostrarDialogoEnvio by remember { mutableStateOf(false) }
+        val contexto = LocalContext.current
 
         Column {
-            when (currentSection) {
-                1 -> IdentificationSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 2
-                    },
-                    onBack = null // Não há seção anterior para a primeira seção
-                )
-                2 -> LocationSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 3
-                    },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(1)) { if (data.isNotEmpty()) data.removeLast() }
+            when (secaoAtual) {
+                1 -> secaoIdentificacao(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 2
                     }
                 )
-                3 -> BoatSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 4
+                2 -> secaoLocal(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 3
                     },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(2)) { if (data.isNotEmpty()) data.removeLast() }
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(1)) { if (dados.isNotEmpty()) dados.removeLast() }
                     }
                 )
-                4 -> CampingSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 5
+                3 -> secaoEmbarcacao(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 4
                     },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(3)) { if (data.isNotEmpty()) data.removeLast() }
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(2)) { if (dados.isNotEmpty()) dados.removeLast() }
                     }
                 )
-                5 -> FishingGearSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 6
+                4 -> secaoAcampamento(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 5
                     },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(4)) { if (data.isNotEmpty()) data.removeLast() }
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(3)) { if (dados.isNotEmpty()) dados.removeLast() }
                     }
                 )
-                6 -> CollectedFishSection(
-                    onNext = { sectionData ->
-                        data.addAll(sectionData)
-                        currentSection = 7
+                5 -> secaoArtesPesca(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 6
                     },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(5)) { if (data.isNotEmpty()) data.removeLast() }
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(4)) { if (dados.isNotEmpty()) dados.removeLast() }
                     }
                 )
-                7 -> AccountingSection(
-                    onSubmit = { sectionData ->
-                        data.addAll(sectionData)
-                        writeCSV(data)
-                        showSuccessDialog = true // Exibe o alerta de sucesso
-                        data.clear() // Limpa os dados após salvar
+                6 -> secaoPeixesColetados(
+                    aoAvancar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        secaoAtual = 7
                     },
-                    onBack = {
-                        currentSection--
-                        repeat(getSectionDataSize(6)) { if (data.isNotEmpty()) data.removeLast() }
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(5)) { if (dados.isNotEmpty()) dados.removeLast() }
+                    }
+                )
+                7 -> secaoContabilizacao(
+                    aoEnviar = { dadosSecao ->
+                        dados.addAll(dadosSecao)
+                        escreverCSV(dados)
+                        mostrarDialogoSucesso = true
+                        dados.clear()
+                    },
+                    aoVoltar = {
+                        secaoAtual--
+                        repeat(obterTamanhoDadosSecao(6)) { if (dados.isNotEmpty()) dados.removeLast() }
                     }
                 )
             }
         }
 
-        if (showSuccessDialog) {
+        if (mostrarDialogoSucesso) {
             AlertDialog(
-                onDismissRequest = { showSuccessDialog = false },
+                onDismissRequest = { mostrarDialogoSucesso = false },
                 title = { Text("Registro realizado com sucesso") },
                 confirmButton = {
                     Button(onClick = {
-                        showSuccessDialog = false
-                        showSendDialog = true // Exibe o próximo alerta para envio
+                        mostrarDialogoSucesso = false
+                        mostrarDialogoEnvio = true // Exibe o próximo alerta para envio
                     }) {
                         Text("OK")
                     }
@@ -180,28 +177,28 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        if (showSendDialog) {
+        if (mostrarDialogoEnvio) {
             AlertDialog(
-                onDismissRequest = { showSendDialog = false },
+                onDismissRequest = { mostrarDialogoEnvio = false },
                 title = { Text("Deseja enviar os registros coletados?") },
                 confirmButton = {
                     Button(onClick = {
-                        showSendDialog = false
-                        val file = writeCSV(data) // Recupera o arquivo CSV
-                        file?.let {
-                            val shareIntent = Intent().apply {
+                        mostrarDialogoEnvio = false
+                        val arquivo = escreverCSV(dados) // Recupera o arquivo CSV
+                        arquivo?.let {
+                            val intentCompartilhamento = Intent().apply {
                                 action = Intent.ACTION_SEND
                                 type = "text/csv"
-                                putExtra(Intent.EXTRA_STREAM, file.toURI())
+                                putExtra(Intent.EXTRA_STREAM, arquivo.toURI())
                             }
-                            context.startActivity(Intent.createChooser(shareIntent, "Enviar arquivo via"))
+                            contexto.startActivity(Intent.createChooser(intentCompartilhamento, "Enviar arquivo via"))
                         }
                     }) {
                         Text("Sim")
                     }
                 },
                 dismissButton = {
-                    Button(onClick = { showSendDialog = false }) {
+                    Button(onClick = { mostrarDialogoEnvio = false }) {
                         Text("Não")
                     }
                 }
@@ -210,8 +207,8 @@ class MainActivity : ComponentActivity() {
     }
 
     // Add this function to get the number of data items for each section
-    fun getSectionDataSize(section: Int): Int {
-        return when (section) {
+    private fun obterTamanhoDadosSecao(secao: Int): Int {
+        return when (secao) {
             1 -> 7 // Identification section has 7 data items
             2 -> 4 // Location section has 4 data items
             3 -> 3 // Boat section has 3 data items
@@ -224,7 +221,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun IdentificationSection(onNext: (List<String>) -> Unit, onBack: (() -> Unit)?) {
+    private fun secaoIdentificacao(aoAvancar: (List<String>) -> Unit) {
         var nomePescador by remember { mutableStateOf("") }
         var nomeComunidade by remember { mutableStateOf("") }
         var diaInicio by remember { mutableStateOf("") }
@@ -240,25 +237,25 @@ class MainActivity : ComponentActivity() {
             "SÃO JORGE DO GOGA", "SAÚDE", "TACHO", "VAVAZÃO"
         )
 
-        val context = LocalContext.current
-        val calendar = Calendar.getInstance()
+        val contexto = LocalContext.current
+        val calendario = Calendar.getInstance()
 
-        fun updateDaysAndWeeks(start: String, end: String) {
-            if (start.isNotEmpty() && end.isNotEmpty()) {
+        fun atualizarDiasESemanas(inicio: String, fim: String) {
+            if (inicio.isNotEmpty() && fim.isNotEmpty()) {
                 val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                val startDate = sdf.parse(start)
-                val endDate = sdf.parse(end)
+                val dataInicio = sdf.parse(inicio)
+                val dataFim = sdf.parse(fim)
                 
-                if (startDate != null && endDate != null) {
-                    val diffInMillis = endDate.time - startDate.time
+                if (dataInicio != null && dataFim != null) {
+                    val diffInMillis = dataFim.time - dataInicio.time
                     qtdDias = (TimeUnit.DAYS.convert(diffInMillis, TimeUnit.MILLISECONDS) + 1).toString() // Adicionado +1 aqui
 
-                    val daysOfWeek = mutableListOf<String>()
-                    val tempCalendar = Calendar.getInstance()
-                    tempCalendar.time = startDate
+                    val diasDaSemana = mutableListOf<String>()
+                    val calendarioTemporario = Calendar.getInstance()
+                    calendarioTemporario.time = dataInicio
 
-                    while (!tempCalendar.time.after(endDate)) {
-                        daysOfWeek.add(when (tempCalendar.get(Calendar.DAY_OF_WEEK)) {
+                    while (!calendarioTemporario.time.after(dataFim)) {
+                        diasDaSemana.add(when (calendarioTemporario.get(Calendar.DAY_OF_WEEK)) {
                             Calendar.SUNDAY -> "Domingo"
                             Calendar.MONDAY -> "Segunda"
                             Calendar.TUESDAY -> "Terça"
@@ -268,33 +265,33 @@ class MainActivity : ComponentActivity() {
                             Calendar.SATURDAY -> "Sábado"
                             else -> ""
                         })
-                        tempCalendar.add(Calendar.DAY_OF_MONTH, 1)
+                        calendarioTemporario.add(Calendar.DAY_OF_MONTH, 1)
                     }
-                    diasSemana = daysOfWeek.distinct().joinToString(", ")
+                    diasSemana = diasDaSemana.distinct().joinToString(", ")
                 }
             }
         }
 
-        val startDatePicker = DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                diaInicio = String.format("%02d/%02d/%d", dayOfMonth, month + 1, year)
-                updateDaysAndWeeks(diaInicio, diaFim)
+        val seletorDataInicio = DatePickerDialog(
+            contexto,
+            { _, ano, mes, diaDoMes ->
+                diaInicio = String.format("%02d/%02d/%d", diaDoMes, mes + 1, ano)
+                atualizarDiasESemanas(diaInicio, diaFim)
             },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
+            calendario.get(Calendar.YEAR),
+            calendario.get(Calendar.MONTH),
+            calendario.get(Calendar.DAY_OF_MONTH)
         )
 
-        val endDatePicker = DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                diaFim = String.format("%02d/%02d/%d", dayOfMonth, month + 1, year)
-                updateDaysAndWeeks(diaInicio, diaFim)
+        val seletorDataFim = DatePickerDialog(
+            contexto,
+            { _, ano, mes, diaDoMes ->
+                diaFim = String.format("%02d/%02d/%d", diaDoMes, mes + 1, ano)
+                atualizarDiasESemanas(diaInicio, diaFim)
             },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
+            calendario.get(Calendar.YEAR),
+            calendario.get(Calendar.MONTH),
+            calendario.get(Calendar.DAY_OF_MONTH)
         )
 
         Column(
@@ -350,7 +347,7 @@ class MainActivity : ComponentActivity() {
                 onValueChange = { },
                 label = { Text("Dia do Início da Pesca") },
                 trailingIcon = {
-                    IconButton(onClick = { startDatePicker.show() }) {
+                    IconButton(onClick = { seletorDataInicio.show() }) {
                         Icon(Icons.Default.DateRange, contentDescription = "Selecionar data de início")
                     }
                 },
@@ -363,7 +360,7 @@ class MainActivity : ComponentActivity() {
                 onValueChange = { },
                 label = { Text("Dia do Fim da Pesca") },
                 trailingIcon = {
-                    IconButton(onClick = { endDatePicker.show() }) {
+                    IconButton(onClick = { seletorDataFim.show() }) {
                         Icon(Icons.Default.DateRange, contentDescription = "Selecionar data de fim")
                     }
                 },
@@ -389,7 +386,7 @@ class MainActivity : ComponentActivity() {
 
             Button(
                 onClick = {
-                    onNext(listOf("1", nomePescador, nomeComunidade, diaInicio, diaFim, diasSemana, qtdDias))
+                    aoAvancar(listOf("1", nomePescador, nomeComunidade, diaInicio, diaFim, diasSemana, qtdDias))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -397,23 +394,12 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text("Próxima Seção")
             }
-
-            if (onBack != null) {
-                Button(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                ) {
-                    Text("Voltar")
-                }
-            }
         }
     }
 
     @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun LocationSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoLocal(aoAvancar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var nomePorto by remember { mutableStateOf("") }
         var rio by remember { mutableStateOf("") }
         var estado by remember { mutableStateOf("") }
@@ -490,7 +476,7 @@ class MainActivity : ComponentActivity() {
             )
 
             Button(
-                onClick = { onNext(listOf(nomePorto, rio, estado, cidade)) },
+                onClick = { aoAvancar(listOf(nomePorto, rio, estado, cidade)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
@@ -499,7 +485,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
@@ -513,7 +499,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun BoatSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoEmbarcacao(aoAvancar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var embarcacoes by remember { mutableStateOf(listOf<Embarcacao>()) }
         var tipoSelecionado by remember { mutableStateOf("") }
         var tamanho by remember { mutableStateOf("") }
@@ -610,8 +596,8 @@ class MainActivity : ComponentActivity() {
 
             Button(
                 onClick = { 
-                    val data = embarcacoes.flatMap { listOf(it.tipo, it.tamanho, it.potencia) }
-                    onNext(data)
+                    val dados = embarcacoes.flatMap { listOf(it.tipo, it.tamanho, it.potencia) }
+                    aoAvancar(dados)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -621,7 +607,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
@@ -633,7 +619,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun CampingSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoAcampamento(aoAvancar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var nomeAcampamento by remember { mutableStateOf("") }
         var nomePesqueiro by remember { mutableStateOf("") }
         var ambientesSelecionados by remember { mutableStateOf(setOf<String>()) }
@@ -707,7 +693,7 @@ class MainActivity : ComponentActivity() {
 
             Button(
                 onClick = { 
-                    onNext(listOf(nomeAcampamento, nomePesqueiro, ambientesSelecionados.joinToString(",")))
+                    aoAvancar(listOf(nomeAcampamento, nomePesqueiro, ambientesSelecionados.joinToString(",")))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -717,7 +703,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
@@ -728,7 +714,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun FishingGearSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoArtesPesca(aoAvancar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var instrumento by remember { mutableStateOf("") }
         var estrategia by remember { mutableStateOf("") }
         var quantidade by remember { mutableStateOf("") }
@@ -772,7 +758,7 @@ class MainActivity : ComponentActivity() {
             )
 
             Button(
-                onClick = { onNext(listOf(instrumento, estrategia, quantidade, detalhes)) },
+                onClick = { aoAvancar(listOf(instrumento, estrategia, quantidade, detalhes)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
@@ -781,7 +767,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
@@ -792,7 +778,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun CollectedFishSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoPeixesColetados(aoAvancar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var peixe by remember { mutableStateOf("") }
         var artePesca by remember { mutableStateOf("") }
         var fatorKgCambo by remember { mutableStateOf("") }
@@ -844,7 +830,7 @@ class MainActivity : ComponentActivity() {
             )
 
             Button(
-                onClick = { onNext(listOf(peixe, artePesca, fatorKgCambo, precoVenda, qtdConsumida)) },
+                onClick = { aoAvancar(listOf(peixe, artePesca, fatorKgCambo, precoVenda, qtdConsumida)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
@@ -853,7 +839,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
@@ -864,7 +850,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun AccountingSection(onSubmit: (List<String>) -> Unit, onBack: () -> Unit) {
+    private fun secaoContabilizacao(aoEnviar: (List<String>) -> Unit, aoVoltar: () -> Unit) {
         var gelo by remember { mutableStateOf("") }
         var rancho by remember { mutableStateOf("") }
         var combustivel by remember { mutableStateOf("") }
@@ -965,7 +951,7 @@ class MainActivity : ComponentActivity() {
             )
 
             Button(
-                onClick = { onSubmit(listOf(gelo, rancho, combustivel, outros, qtdPescadores, vendidoPara, valorGasto, totalConsumido, totalVendido, totalArrecadado)) },
+                onClick = { aoEnviar(listOf(gelo, rancho, combustivel, outros, qtdPescadores, vendidoPara, valorGasto, totalConsumido, totalVendido, totalArrecadado)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
@@ -974,7 +960,7 @@ class MainActivity : ComponentActivity() {
             }
 
             Button(
-                onClick = onBack,
+                onClick = aoVoltar,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
