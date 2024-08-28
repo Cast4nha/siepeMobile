@@ -1,6 +1,8 @@
 package com.example.siepemobile
 
+// Adicionando os novos imports necessários
 import android.Manifest
+import android.app.DatePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -9,11 +11,12 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +31,9 @@ import java.io.FileWriter
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
+@OptIn(ExperimentalMaterialApi::class)
 class MainActivity : ComponentActivity() {
     private var isHeaderWritten = false
 
@@ -53,23 +58,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun writeCSV(data: List<String>): File? {
-        val fileName = "pesca_data.csv"
+        val fileName = "pesca_data_${System.currentTimeMillis()}.csv"
         val file = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
 
         try {
-            val writer = FileWriter(file, true)
-
-            // Escreve o cabeçalho apenas uma vez
-            if (!isHeaderWritten) {
+            FileWriter(file).use { writer ->
                 writer.append("Seção,Nome do Pescador,Comunidade,Dia do Início,Dia do Fim,Dias da Semana,Quantos dias pescou?,...")
                 writer.append("\n")
-                isHeaderWritten = true
+                writer.append(data.joinToString(","))
+                writer.append("\n")
             }
-
-            writer.append(data.joinToString(","))
-            writer.append("\n")
-            writer.flush()
-            writer.close()
             println("Arquivo salvo com sucesso em: ${file.absolutePath}")
             runOnUiThread {
                 Toast.makeText(this, "Arquivo salvo em: ${file.absolutePath}", Toast.LENGTH_LONG).show()
@@ -93,37 +91,78 @@ class MainActivity : ComponentActivity() {
         var showSendDialog by remember { mutableStateOf(false) }
         val context = LocalContext.current
 
-        when (currentSection) {
-            1 -> IdentificationSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 2
-            })
-            2 -> LocationSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 3
-            })
-            3 -> BoatSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 4
-            })
-            4 -> CampingSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 5
-            })
-            5 -> FishingGearSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 6
-            })
-            6 -> CollectedFishSection(onNext = { sectionData ->
-                data.addAll(sectionData)
-                currentSection = 7
-            })
-            7 -> AccountingSection(onSubmit = { sectionData ->
-                data.addAll(sectionData)
-                val file = writeCSV(data)
-                showSuccessDialog = true // Exibe o alerta de sucesso
-                data.clear() // Limpa os dados após salvar
-            })
+        Column {
+            when (currentSection) {
+                1 -> IdentificationSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 2
+                    },
+                    onBack = null // Não há seção anterior para a primeira seção
+                )
+                2 -> LocationSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 3
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(1)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+                3 -> BoatSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 4
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(2)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+                4 -> CampingSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 5
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(3)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+                5 -> FishingGearSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 6
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(4)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+                6 -> CollectedFishSection(
+                    onNext = { sectionData ->
+                        data.addAll(sectionData)
+                        currentSection = 7
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(5)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+                7 -> AccountingSection(
+                    onSubmit = { sectionData ->
+                        data.addAll(sectionData)
+                        writeCSV(data)
+                        showSuccessDialog = true // Exibe o alerta de sucesso
+                        data.clear() // Limpa os dados após salvar
+                    },
+                    onBack = {
+                        currentSection--
+                        repeat(getSectionDataSize(6)) { if (data.isNotEmpty()) data.removeLast() }
+                    }
+                )
+            }
         }
 
         if (showSuccessDialog) {
@@ -170,43 +209,93 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Add this function to get the number of data items for each section
+    fun getSectionDataSize(section: Int): Int {
+        return when (section) {
+            1 -> 7 // Identification section has 7 data items
+            2 -> 4 // Location section has 4 data items
+            3 -> 3 // Boat section has 3 data items
+            4 -> 3 // Camping section has 3 data items
+            5 -> 4 // Fishing Gear section has 4 data items
+            6 -> 5 // Collected Fish section has 5 data items
+            7 -> 10 // Accounting section has 10 data items
+            else -> 0
+        }
+    }
 
     @Composable
-    fun IdentificationSection(onNext: (List<String>) -> Unit) {
+    fun IdentificationSection(onNext: (List<String>) -> Unit, onBack: (() -> Unit)?) {
         var nomePescador by remember { mutableStateOf("") }
         var nomeComunidade by remember { mutableStateOf("") }
         var diaInicio by remember { mutableStateOf("") }
         var diaFim by remember { mutableStateOf("") }
         var qtdDias by remember { mutableStateOf("") }
+        var diasSemana by remember { mutableStateOf("") }
+        var expandedComunidade by remember { mutableStateOf(false) }
 
-        // Estado para controlar a visibilidade do menu de seleção de dias
-        var expanded by remember { mutableStateOf(false) }
-        val diasDaSemana = listOf("Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo")
-        val diasSemanaChecked = remember { mutableStateListOf(false, false, false, false, false, false, false) }
+        val comunidades = listOf(
+            "TAUIRY", "ALTAMIRA 07", "APINAGÉS", "CAJAZEIRAS", "COQUEIRO", "ILHA DE CAMPO",
+            "JATOBÁ FERRADO", "PIMENTEIRA", "PRAIA ALTA", "SANTA CRUZ", "SANTO ANTONINO",
+            "SANTO ANTÔNIO DO URUBU", "SÃO FÉLIX", "SÃO GERALDO DO ARAGUAIA (SEDE)",
+            "SÃO JORGE DO GOGA", "SAÚDE", "TACHO", "VAVAZÃO"
+        )
 
-        // Função para calcular o número de dias entre duas datas
-        fun calculateFishingDays(startDate: String, endDate: String): Int {
-            return try {
-                val format = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                val start = format.parse(startDate) ?: return 0
-                val end = format.parse(endDate) ?: return 0
-                val diff = end.time - start.time
-                (diff / (1000 * 60 * 60 * 24)).toInt()
-            } catch (e: Exception) {
-                0
+        val context = LocalContext.current
+        val calendar = Calendar.getInstance()
+
+        fun updateDaysAndWeeks(start: String, end: String) {
+            if (start.isNotEmpty() && end.isNotEmpty()) {
+                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val startDate = sdf.parse(start)
+                val endDate = sdf.parse(end)
+                
+                if (startDate != null && endDate != null) {
+                    val diffInMillis = endDate.time - startDate.time
+                    qtdDias = (TimeUnit.DAYS.convert(diffInMillis, TimeUnit.MILLISECONDS) + 1).toString() // Adicionado +1 aqui
+
+                    val daysOfWeek = mutableListOf<String>()
+                    val tempCalendar = Calendar.getInstance()
+                    tempCalendar.time = startDate
+
+                    while (!tempCalendar.time.after(endDate)) {
+                        daysOfWeek.add(when (tempCalendar.get(Calendar.DAY_OF_WEEK)) {
+                            Calendar.SUNDAY -> "Domingo"
+                            Calendar.MONDAY -> "Segunda"
+                            Calendar.TUESDAY -> "Terça"
+                            Calendar.WEDNESDAY -> "Quarta"
+                            Calendar.THURSDAY -> "Quinta"
+                            Calendar.FRIDAY -> "Sexta"
+                            Calendar.SATURDAY -> "Sábado"
+                            else -> ""
+                        })
+                        tempCalendar.add(Calendar.DAY_OF_MONTH, 1)
+                    }
+                    diasSemana = daysOfWeek.distinct().joinToString(", ")
+                }
             }
         }
 
-        // Atualiza a quantidade de dias pescados com base nas datas fornecidas
-        fun updateFishingDays() {
-            val days = calculateFishingDays(diaInicio, diaFim)
-            qtdDias = days.toString()
-        }
+        val startDatePicker = DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                diaInicio = String.format("%02d/%02d/%d", dayOfMonth, month + 1, year)
+                updateDaysAndWeeks(diaInicio, diaFim)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
 
-        // Função para obter os dias da semana selecionados como string
-        fun getDiasSemanaSelecionados(): String {
-            return diasDaSemana.filterIndexed { index, _ -> diasSemanaChecked[index] }.joinToString(", ")
-        }
+        val endDatePicker = DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                diaFim = String.format("%02d/%02d/%d", dayOfMonth, month + 1, year)
+                updateDaysAndWeeks(diaInicio, diaFim)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
 
         Column(
             modifier = Modifier
@@ -224,76 +313,83 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = nomeComunidade,
-                onValueChange = { nomeComunidade = it },
-                label = { Text("Comunidade") },
+            // Dropdown for Comunidade
+            ExposedDropdownMenuBox(
+                expanded = expandedComunidade,
+                onExpandedChange = { expandedComunidade = !expandedComunidade },
                 modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = diaInicio,
-                onValueChange = { diaInicio = it },
-                label = { Text("Dia do Início da Pesca") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = diaFim,
-                onValueChange = { diaFim = it },
-                label = { Text("Dia do Fim da Pesca") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Campo dropdown para selecionar os dias da semana
-            OutlinedTextField(
-                value = getDiasSemanaSelecionados(),
-                onValueChange = {},  // Não permite edição direta
-                label = { Text("Dias da Semana") },
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,  // Tornar o campo não editável
-                trailingIcon = {
-                    IconButton(onClick = { expanded = !expanded }) {
-                        Icon(imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, contentDescription = null)
-                    }
-                }
-            )
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
             ) {
-                diasDaSemana.forEachIndexed { index, dia ->
-                    DropdownMenuItem(
-                        onClick = { diasSemanaChecked[index] = !diasSemanaChecked[index] }
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = diasSemanaChecked[index],
-                                onCheckedChange = null  // A lógica de seleção já é gerenciada no onClick
-                            )
-                            Text(text = dia)
+                OutlinedTextField(
+                    value = nomeComunidade,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Comunidade") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedComunidade) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expandedComunidade,
+                    onDismissRequest = { expandedComunidade = false }
+                ) {
+                    comunidades.forEach { comunidade ->
+                        DropdownMenuItem(
+                            onClick = {
+                                nomeComunidade = comunidade
+                                expandedComunidade = false
+                            }
+                        ) {
+                            Text(text = comunidade)
                         }
                     }
                 }
             }
 
             OutlinedTextField(
+                value = diaInicio,
+                onValueChange = { },
+                label = { Text("Dia do Início da Pesca") },
+                trailingIcon = {
+                    IconButton(onClick = { startDatePicker.show() }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Selecionar data de início")
+                    }
+                },
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = diaFim,
+                onValueChange = { },
+                label = { Text("Dia do Fim da Pesca") },
+                trailingIcon = {
+                    IconButton(onClick = { endDatePicker.show() }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Selecionar data de fim")
+                    }
+                },
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = diasSemana,
+                onValueChange = { },
+                label = { Text("Dias da Semana") },
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
                 value = qtdDias,
-                onValueChange = { qtdDias = it },
+                onValueChange = { },
                 label = { Text("Quantos dias você pescou?") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Button(
                 onClick = {
-                    updateFishingDays()
-                    val diasSelecionados = getDiasSemanaSelecionados()
-                    onNext(listOf("1", nomePescador, nomeComunidade, diaInicio, diaFim, diasSelecionados, qtdDias))
+                    onNext(listOf("1", nomePescador, nomeComunidade, diaInicio, diaFim, diasSemana, qtdDias))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -301,15 +397,36 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text("Próxima Seção")
             }
+
+            if (onBack != null) {
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                ) {
+                    Text("Voltar")
+                }
+            }
         }
     }
 
+    @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun LocationSection(onNext: (List<String>) -> Unit) {
+    fun LocationSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
         var nomePorto by remember { mutableStateOf("") }
         var rio by remember { mutableStateOf("") }
         var estado by remember { mutableStateOf("") }
         var cidade by remember { mutableStateOf("") }
+        var expandedEstado by remember { mutableStateOf(false) }
+
+        val estados = listOf(
+            "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia", "Ceará", "Distrito Federal",
+            "Espírito Santo", "Goiás", "Maranhão", "Mato Grosso", "Mato Grosso do Sul",
+            "Minas Gerais", "Pará", "Paraíba", "Paraná", "Pernambuco", "Piauí",
+            "Rio de Janeiro", "Rio Grande do Norte", "Rio Grande do Sul", "Rondônia",
+            "Roraima", "Santa Catarina", "São Paulo", "Sergipe", "Tocantins"
+        )
 
         Column(
             modifier = Modifier
@@ -334,12 +451,36 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = estado,
-                onValueChange = { estado = it },
-                label = { Text("Estado") },
+            ExposedDropdownMenuBox(
+                expanded = expandedEstado,
+                onExpandedChange = { expandedEstado = !expandedEstado },
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = estado,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Estado") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstado) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expandedEstado,
+                    onDismissRequest = { expandedEstado = false }
+                ) {
+                    estados.forEach { estadoOpcao ->
+                        DropdownMenuItem(
+                            onClick = {
+                                estado = estadoOpcao
+                                expandedEstado = false
+                            }
+                        ) {
+                            Text(text = estadoOpcao)
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = cidade,
@@ -356,14 +497,36 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text("Próxima Seção")
             }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
+            }
         }
     }
 
+    data class Embarcacao(val tipo: String, val tamanho: String, val potencia: String)
+
+    @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun BoatSection(onNext: (List<String>) -> Unit) {
-        var tipo by remember { mutableStateOf("") }
+    fun BoatSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
+        var embarcacoes by remember { mutableStateOf(listOf<Embarcacao>()) }
+        var tipoSelecionado by remember { mutableStateOf("") }
         var tamanho by remember { mutableStateOf("") }
         var potencia by remember { mutableStateOf("") }
+        var expandedTipo by remember { mutableStateOf(false) }
+
+        val tiposEmbarcacao = listOf(
+            "BARCO COM MOTOR DE CENTRO",
+            "CANOA",
+            "CANOA A REMO",
+            "RABETA",
+            "VOADEIRA"
+        )
 
         Column(
             modifier = Modifier
@@ -374,12 +537,36 @@ class MainActivity : ComponentActivity() {
         ) {
             Text(text = "Embarcação", fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
 
-            OutlinedTextField(
-                value = tipo,
-                onValueChange = { tipo = it },
-                label = { Text("Tipo") },
+            ExposedDropdownMenuBox(
+                expanded = expandedTipo,
+                onExpandedChange = { expandedTipo = !expandedTipo },
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = tipoSelecionado,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Tipo de Embarcação") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedTipo) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expandedTipo,
+                    onDismissRequest = { expandedTipo = false }
+                ) {
+                    tiposEmbarcacao.forEach { tipo ->
+                        DropdownMenuItem(
+                            onClick = {
+                                tipoSelecionado = tipo
+                                expandedTipo = false
+                            }
+                        ) {
+                            Text(text = tipo)
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = tamanho,
@@ -396,21 +583,63 @@ class MainActivity : ComponentActivity() {
             )
 
             Button(
-                onClick = { onNext(listOf(tipo, tamanho, potencia)) },
+                onClick = {
+                    if (tipoSelecionado.isNotEmpty() && tamanho.isNotEmpty() && potencia.isNotEmpty()) {
+                        embarcacoes = embarcacoes + Embarcacao(tipoSelecionado, tamanho, potencia)
+                        tipoSelecionado = ""
+                        tamanho = ""
+                        potencia = ""
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Adicionar Embarcação")
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                items(embarcacoes) { embarcacao ->
+                    Text("${embarcacao.tipo}: Tamanho ${embarcacao.tamanho}, Potência ${embarcacao.potencia}")
+                }
+            }
+
+            Button(
+                onClick = { 
+                    val data = embarcacoes.flatMap { listOf(it.tipo, it.tamanho, it.potencia) }
+                    onNext(data)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
             ) {
                 Text("Próxima Seção")
             }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
+            }
         }
     }
 
+    @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun CampingSection(onNext: (List<String>) -> Unit) {
+    fun CampingSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
         var nomeAcampamento by remember { mutableStateOf("") }
         var nomePesqueiro by remember { mutableStateOf("") }
-        var ambiente by remember { mutableStateOf("") }
+        var ambientesSelecionados by remember { mutableStateOf(setOf<String>()) }
+        var expandedAmbientes by remember { mutableStateOf(false) }
+
+        val ambientes = listOf("Beira do rio", "Riacho", "Igarapé", "Pedral")
 
         Column(
             modifier = Modifier
@@ -435,26 +664,71 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = ambiente,
-                onValueChange = { ambiente = it },
-                label = { Text("Ambiente") },
+            ExposedDropdownMenuBox(
+                expanded = expandedAmbientes,
+                onExpandedChange = { expandedAmbientes = !expandedAmbientes },
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = if (ambientesSelecionados.isEmpty()) "Selecione os ambientes" 
+                            else ambientesSelecionados.joinToString(", "),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Ambientes") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAmbientes) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expandedAmbientes,
+                    onDismissRequest = { expandedAmbientes = false }
+                ) {
+                    ambientes.forEach { ambiente ->
+                        DropdownMenuItem(
+                            onClick = {
+                                ambientesSelecionados = if (ambientesSelecionados.contains(ambiente)) {
+                                    ambientesSelecionados - ambiente
+                                } else {
+                                    ambientesSelecionados + ambiente
+                                }
+                            }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = ambientesSelecionados.contains(ambiente),
+                                    onCheckedChange = null
+                                )
+                                Text(text = ambiente)
+                            }
+                        }
+                    }
+                }
+            }
 
             Button(
-                onClick = { onNext(listOf(nomeAcampamento, nomePesqueiro, ambiente)) },
+                onClick = { 
+                    onNext(listOf(nomeAcampamento, nomePesqueiro, ambientesSelecionados.joinToString(",")))
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
             ) {
                 Text("Próxima Seção")
             }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
+            }
         }
     }
 
     @Composable
-    fun FishingGearSection(onNext: (List<String>) -> Unit) {
+    fun FishingGearSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
         var instrumento by remember { mutableStateOf("") }
         var estrategia by remember { mutableStateOf("") }
         var quantidade by remember { mutableStateOf("") }
@@ -505,11 +779,20 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text("Próxima Seção")
             }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
+            }
         }
     }
 
     @Composable
-    fun CollectedFishSection(onNext: (List<String>) -> Unit) {
+    fun CollectedFishSection(onNext: (List<String>) -> Unit, onBack: () -> Unit) {
         var peixe by remember { mutableStateOf("") }
         var artePesca by remember { mutableStateOf("") }
         var fatorKgCambo by remember { mutableStateOf("") }
@@ -568,11 +851,20 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text("Próxima Seção")
             }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
+            }
         }
     }
 
     @Composable
-    fun AccountingSection(onSubmit: (List<String>) -> Unit) {
+    fun AccountingSection(onSubmit: (List<String>) -> Unit, onBack: () -> Unit) {
         var gelo by remember { mutableStateOf("") }
         var rancho by remember { mutableStateOf("") }
         var combustivel by remember { mutableStateOf("") }
@@ -679,6 +971,15 @@ class MainActivity : ComponentActivity() {
                     .padding(top = 16.dp)
             ) {
                 Text("Finalizar Cadastro")
+            }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            ) {
+                Text("Voltar")
             }
         }
     }

@@ -21,6 +21,8 @@
         <activity android:name=".MenuActivity" android:exported="true" />
         <activity android:name=".MainActivity" android:exported="true" />
 
+        <activity android:name=".ExportActivity" android:exported="false" />
+
         <!-- Outros componentes como services, receivers, providers, etc. -->
 
     </application>

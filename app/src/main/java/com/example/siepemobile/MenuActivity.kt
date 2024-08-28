@@ -46,6 +46,18 @@ class MenuActivity : ComponentActivity() {
             ) {
                 Text("Ir para o Formulário")
             }
+
+            Button(
+                onClick = {
+                    val intent = Intent(this@MenuActivity, ExportActivity::class.java)
+                    startActivity(intent)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Text("Exportar CSV")
+            }
         }
     }
 }
